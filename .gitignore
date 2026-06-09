@@ -1,0 +1,86 @@
+# Maven / Java
+target/
+*.class
+*.war
+*.ear
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+dependency-reduced-pom.xml
+
+# Build output that may appear in module source folders
+!**/src/main/**/target/
+!**/src/test/**/target/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+out/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse / STS
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Vue / Node frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/.nuxt/
+frontend/coverage/
+node_modules/
+dist/
+dist-ssr/
+.vite/
+.nuxt/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Tomcat / local runtime
+logs/
+*.log
+*.pid
+*.hprof
+work/
+temp/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.local.properties
+src/main/resources/*-local.properties
+src/main/resources/*-local.yml
+src/main/resources/*-local.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc caches
+.sass-cache/
+.cache/
+.eslintcache
