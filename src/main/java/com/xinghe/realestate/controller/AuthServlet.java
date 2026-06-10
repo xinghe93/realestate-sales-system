@@ -48,7 +48,9 @@ public class AuthServlet extends BaseServlet {
 
     private void login(HttpServletRequest request, HttpServletResponse response) throws IOException {
         LoginRequest loginRequest = JsonUtil.read(request, LoginRequest.class);
+        request.getSession().removeAttribute(SessionKeys.LOGIN_USER);
         String answer = (String) request.getSession().getAttribute(SessionKeys.CAPTCHA_ANSWER);
+        request.getSession().removeAttribute(SessionKeys.CAPTCHA_ANSWER);
         if (answer == null || loginRequest.captcha == null || !answer.equals(loginRequest.captcha.trim())) {
             throw new AppException("验证码错误");
         }
@@ -56,7 +58,6 @@ public class AuthServlet extends BaseServlet {
         try {
             LoginUser loginUser = authService.login(loginRequest.username, loginRequest.password);
             request.getSession().setAttribute(SessionKeys.LOGIN_USER, loginUser);
-            request.getSession().removeAttribute(SessionKeys.CAPTCHA_ANSWER);
             ok(response, "登录成功", loginUser);
         } catch (AppException e) {
             JsonUtil.write(response, e.getStatusCode(), ApiResponse.fail(e.getMessage()));

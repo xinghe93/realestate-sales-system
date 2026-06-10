@@ -30,7 +30,14 @@
         </div>
         <div class="detail-actions">
           <el-button type="primary" :icon="Phone">联系管理员</el-button>
-          <el-button :icon="Star" @click="favoriteProperty">收藏</el-button>
+          <el-button
+            :type="isFavorite ? 'primary' : 'default'"
+            :icon="isFavorite ? StarFilled : Star"
+            :loading="favoriteLoading"
+            @click="toggleFavorite"
+          >
+            {{ isFavorite ? '已收藏' : '收藏' }}
+          </el-button>
         </div>
       </article>
 
@@ -60,10 +67,10 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Phone, Star } from '@element-plus/icons-vue'
+import { ArrowLeft, Phone, Star, StarFilled } from '@element-plus/icons-vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { getProperty } from '../api/properties'
-import { addFavorite } from '../api/favorites'
+import { addFavorite, getFavorites, removeFavorite } from '../api/favorites'
 import { normalizeProperty } from '../composables/usePropertyCatalog'
 import { sampleProperties } from '../data/mockData'
 import { session } from '../stores/session'
@@ -74,6 +81,8 @@ const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const property = ref(null)
+const isFavorite = ref(false)
+const favoriteLoading = ref(false)
 const detailMapFrameRef = ref(null)
 const detailMapSize = ref({ width: 0, height: 0 })
 let detailMapObserver = null
@@ -122,9 +131,26 @@ async function loadProperty() {
   } finally {
     loading.value = false
   }
+  await loadFavoriteState()
 }
 
-async function favoriteProperty() {
+async function loadFavoriteState() {
+  if (!session.user || !property.value?.id) {
+    isFavorite.value = false
+    return
+  }
+  try {
+    const response = await getFavorites()
+    const favorites = Array.isArray(response.data) ? response.data : []
+    isFavorite.value = favorites.some(
+      (item) => String(item.propertyId ?? item.property?.id) === String(property.value.id)
+    )
+  } catch {
+    isFavorite.value = false
+  }
+}
+
+async function toggleFavorite() {
   if (!session.user) {
     router.push('/login')
     return
@@ -133,11 +159,21 @@ async function favoriteProperty() {
     ElMessage.warning('房源信息未加载')
     return
   }
+  favoriteLoading.value = true
   try {
-    await addFavorite(property.value.id)
-    ElMessage.success('已加入收藏')
+    if (isFavorite.value) {
+      await removeFavorite(property.value.id)
+      isFavorite.value = false
+      ElMessage.success('已取消收藏')
+    } else {
+      await addFavorite(property.value.id)
+      isFavorite.value = true
+      ElMessage.success('已加入收藏')
+    }
   } catch {
-    ElMessage.error('收藏失败，请稍后重试')
+    ElMessage.error(isFavorite.value ? '取消收藏失败，请稍后重试' : '收藏失败，请稍后重试')
+  } finally {
+    favoriteLoading.value = false
   }
 }
 

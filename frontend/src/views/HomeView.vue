@@ -24,36 +24,42 @@
         >
           <span><b>{{ property.title }}</b></span>
         </button>
-        <article
-          v-if="hoveredProperty"
-          class="map-hover-card"
-          :style="{ left: `${hoveredProperty.mapX}%`, top: `${hoveredProperty.mapY}%` }"
-          @mouseenter="cancelHidePropertyCard"
-          @mouseleave="scheduleHidePropertyCard"
-          @click.stop="goToDetail(hoveredProperty)"
-        >
-          <div class="map-card-art">
-            <img v-if="hoveredProperty.imageUrl" :src="hoveredProperty.imageUrl" :alt="hoveredProperty.title" />
-          </div>
-          <div class="map-card-body">
-            <div class="detail-topline">
-              <h2>{{ hoveredProperty.title }}</h2>
-              <StatusBadge :property-status="hoveredProperty.status" />
-            </div>
-            <p class="map-card-location">{{ hoveredProperty.region }} · {{ hoveredProperty.address }}</p>
-            <p>{{ hoveredProperty.layout }} 丨 {{ squareMeters(hoveredProperty.area) }} 丨 南北通透</p>
-            <div class="detail-price">
-              <strong>{{ moneyWan(hoveredProperty.price) }}</strong>
-              <span>{{ unitPrice(hoveredProperty) }}</span>
-            </div>
-            <div class="map-card-actions">
-              <span>☆ 收藏</span>
-              <i></i>
-              <span>☎ 联系管理员</span>
-            </div>
-          </div>
-        </article>
       </div>
+      <article
+        v-if="hoveredProperty"
+        :key="hoveredProperty.id"
+        class="map-hover-card"
+        :style="hoverCardStyle"
+        @mouseenter="cancelHidePropertyCard"
+        @mouseleave="scheduleHidePropertyCard"
+        @click.stop="goToDetail(hoveredProperty)"
+      >
+        <div class="map-card-art">
+          <img
+            v-if="hoveredProperty.imageUrl"
+            :key="`${hoveredProperty.id}-${hoveredProperty.imageUrl}`"
+            :src="hoveredProperty.imageUrl"
+            :alt="hoveredProperty.title"
+          />
+        </div>
+        <div class="map-card-body">
+          <div class="detail-topline">
+            <h2>{{ hoveredProperty.title }}</h2>
+            <StatusBadge :property-status="hoveredProperty.status" />
+          </div>
+          <p class="map-card-location">{{ hoveredProperty.region }} · {{ hoveredProperty.address }}</p>
+          <p>{{ hoveredProperty.layout }} 丨 {{ squareMeters(hoveredProperty.area) }} 丨 南北通透</p>
+          <div class="detail-price">
+            <strong>{{ moneyWan(hoveredProperty.price) }}</strong>
+            <span>{{ unitPrice(hoveredProperty) }}</span>
+          </div>
+          <div class="map-card-actions">
+            <span>☆ 收藏</span>
+            <i></i>
+            <span>☎ 联系管理员</span>
+          </div>
+        </div>
+      </article>
     </section>
 
     <aside class="atlas-filter">
@@ -124,6 +130,7 @@ const filters = reactive({
 })
 
 const mapOffset = reactive({ x: 0, y: 0 })
+const mapSize = reactive({ width: 0, height: 0 })
 const dragBounds = reactive({ minX: 0, maxX: 0, minY: 0, maxY: 0 })
 const dragState = reactive({
   dragging: false,
@@ -146,9 +153,22 @@ const mapLayerStyle = computed(() => ({
   transform: `translate(${mapOffset.x}px, ${mapOffset.y}px)`
 }))
 
+const hoverCardStyle = computed(() => {
+  if (!hoveredProperty.value) {
+    return {}
+  }
+  return {
+    left: `${mapOffset.x + mapSize.width * Number(hoveredProperty.value.mapX) / 100}px`,
+    top: `${mapOffset.y + mapSize.height * Number(hoveredProperty.value.mapY) / 100}px`
+  }
+})
+
 onMounted(async () => {
   await load()
-  nextTick(updateDragBounds)
+  preloadPropertyImages()
+  await nextTick()
+  updateDragBounds()
+  centerMap()
   window.addEventListener('resize', updateDragBounds)
 })
 
@@ -167,7 +187,19 @@ function resetFilters() {
 
 function showPropertyCard(property) {
   cancelHidePropertyCard()
+  if (hoveredProperty.value?.id === property.id) {
+    return
+  }
   hoveredProperty.value = property
+}
+
+function preloadPropertyImages() {
+  properties.value.forEach((property) => {
+    if (property.imageUrl) {
+      const image = new Image()
+      image.src = property.imageUrl
+    }
+  })
 }
 
 function scheduleHidePropertyCard() {
@@ -250,6 +282,8 @@ function updateDragBounds() {
   dragBounds.maxX = 0
   dragBounds.minY = Math.min(0, canvas.clientHeight - layer.offsetHeight)
   dragBounds.maxY = 0
+  mapSize.width = layer.offsetWidth
+  mapSize.height = layer.offsetHeight
   mapOffset.x = clamp(mapOffset.x, dragBounds.minX, dragBounds.maxX)
   mapOffset.y = clamp(mapOffset.y, dragBounds.minY, dragBounds.maxY)
 }

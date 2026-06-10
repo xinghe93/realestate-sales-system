@@ -43,14 +43,17 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getCaptcha, login } from '../api/auth'
-import { setSessionUser } from '../stores/session'
+import { clearSession, setSessionUser } from '../stores/session'
 
 const router = useRouter()
 const submitting = ref(false)
 const form = reactive({ username: '', password: '', captcha: '' })
 const captcha = reactive({ question: '' })
 
-onMounted(loadCaptcha)
+onMounted(() => {
+  clearSession()
+  loadCaptcha()
+})
 
 async function loadCaptcha() {
   try {
