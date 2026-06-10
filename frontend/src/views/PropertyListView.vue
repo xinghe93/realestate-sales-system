@@ -3,18 +3,17 @@
     <PageHeader
       kicker="Inventory Console"
       title="房源列表"
-      description="管理员新建房源后默认发布，已售房源通过下架隐藏给普通购房用户。"
     >
       <template #actions>
-        <el-button type="primary" :icon="Plus" @click="openCreate">新增房源</el-button>
+        <el-button v-if="isAdmin" type="primary" :icon="Plus" @click="openCreate">新增房源</el-button>
       </template>
     </PageHeader>
 
     <section class="console-layout">
       <aside class="console-rail">
-        <MetricTile label="房源总数" :value="properties.length" hint="后台完整房源池" />
-        <MetricTile label="已发布" :value="published.length" hint="普通用户可见" tone="green" />
-        <MetricTile label="已下架" :value="offline.length" hint="已售或隐藏" tone="red" />
+        <MetricTile label="房源总数" :value="visibleProperties.length" hint="完整房源" />
+        <MetricTile label="已发布" :value="published.length" hint="可售房源" tone="green" />
+        <MetricTile label="已下架" :value="offline.length" hint="已售房源" tone="red" />
       </aside>
 
       <section class="console-main">
@@ -31,12 +30,28 @@
         </div>
 
         <div class="inventory-list" v-loading="loading">
-          <article v-for="property in filteredProperties" :key="property.id" class="inventory-row">
+          <div class="inventory-head" :class="{ 'is-user': !isAdmin }">
+            <span>房源信息</span>
+            <span>价格</span>
+            <span>状态</span>
+            <span v-if="isAdmin">操作</span>
+          </div>
+          <article
+            v-for="property in filteredProperties"
+            :key="property.id"
+            class="inventory-row"
+            :class="{ 'is-user': !isAdmin }"
+            role="button"
+            tabindex="0"
+            @click="goToDetail(property)"
+            @keydown.enter.prevent="goToDetail(property)"
+          >
             <div class="inventory-main">
               <span class="region-token">{{ property.region }}</span>
               <div>
                 <h2>{{ property.title }}</h2>
                 <p>{{ property.address }} · {{ property.layout }} · {{ squareMeters(property.area) }}</p>
+                <button class="row-detail-link" type="button" @click.stop="goToDetail(property)">查看详情</button>
               </div>
             </div>
             <div class="inventory-price">
@@ -44,45 +59,95 @@
               <span>{{ unitPrice(property) }}</span>
             </div>
             <StatusBadge :property-status="property.status" />
-            <div class="inventory-actions">
-              <el-button link type="primary" @click="openEdit(property)">编辑</el-button>
-              <el-button link :type="property.status === 'PUBLISHED' ? 'warning' : 'success'" @click="toggleStatus(property)">
+            <div v-if="isAdmin" class="inventory-actions">
+              <el-button link type="primary" @click.stop="openEdit(property)">编辑</el-button>
+              <el-button link :type="property.status === 'PUBLISHED' ? 'warning' : 'success'" @click.stop="toggleStatus(property)">
                 {{ property.status === 'PUBLISHED' ? '下架' : '发布' }}
               </el-button>
-              <el-button link type="danger" @click="removeRow(property)">删除</el-button>
+              <el-button link type="danger" @click.stop="removeRow(property)">删除</el-button>
             </div>
           </article>
         </div>
       </section>
     </section>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑房源' : '新增房源'" width="720px">
+    <el-dialog
+      v-model="dialogVisible"
+      class="property-editor-dialog"
+      :title="editingId ? '编辑房源' : '新增房源'"
+      width="860px"
+      transition="property-dialog-pop"
+      modal-class="property-editor-overlay"
+      :lock-scroll="false"
+    >
       <el-form class="editor-form" label-position="top" @submit.prevent>
         <el-form-item label="房源名称">
           <el-input v-model="form.title" />
         </el-form-item>
         <el-form-item label="区域">
-          <el-input v-model="form.region" />
+          <el-select
+            v-model="form.region"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或输入区域"
+          >
+            <el-option v-for="region in regions" :key="region" :label="region" :value="region" />
+          </el-select>
         </el-form-item>
         <el-form-item label="地址">
-          <el-input v-model="form.address" />
+          <el-select
+            v-model="form.address"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或输入地址"
+          >
+            <el-option v-for="address in addresses" :key="address" :label="address" :value="address" />
+          </el-select>
         </el-form-item>
         <el-form-item label="户型">
-          <el-input v-model="form.layout" />
+          <el-select
+            v-model="form.layout"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或输入户型"
+          >
+            <el-option v-for="layout in layouts" :key="layout" :label="layout" :value="layout" />
+          </el-select>
         </el-form-item>
         <el-form-item label="总价（万元）">
-          <el-input-number v-model="form.price" :min="0" :precision="0" controls-position="right" />
+          <el-input-number v-model="form.price" :min="0" :precision="0" :controls="false" />
         </el-form-item>
         <el-form-item label="面积（㎡）">
-          <el-input-number v-model="form.area" :min="0" :precision="1" controls-position="right" />
+          <el-input-number v-model="form.area" :min="0" :precision="1" :controls="false" />
         </el-form-item>
         <el-form-item label="描述" class="editor-wide">
-          <el-input v-model="form.description" type="textarea" :rows="3" />
+          <el-input v-model="form.description" type="textarea" :rows="3" resize="none" />
+        </el-form-item>
+        <el-form-item label="地图位置" class="editor-wide">
+          <div class="map-picker" @click="selectMapPosition">
+            <img :src="mapImage" alt="选择房源地图位置" draggable="false" />
+            <span
+              v-if="hasMapPosition"
+              class="map-picker-pin"
+              :style="{ left: `${form.mapX}%`, top: `${form.mapY}%` }"
+            >
+              {{ form.title || '房源' }}
+            </span>
+            <strong v-else>点击地图选择房源位置</strong>
+          </div>
+          <p class="map-picker-meta">
+            坐标：{{ hasMapPosition ? `${Number(form.mapX).toFixed(2)}%, ${Number(form.mapY).toFixed(2)}%` : '未选择' }}
+          </p>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveProperty">保存并发布</el-button>
+        <el-button type="primary" :loading="saving" @click="saveProperty">
+          {{ editingId ? '保存' : ('保存并' + (form.status === 'PUBLISHED' ? '发布' : '下架')) }}
+        </el-button>
       </template>
     </el-dialog>
   </main>
@@ -90,7 +155,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -99,8 +164,11 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { usePropertyCatalog } from '../composables/usePropertyCatalog'
 import { createProperty, deleteProperty, updateProperty, updatePropertyStatus } from '../api/properties'
 import { moneyWan, squareMeters, unitPrice } from '../utils/formatters'
+import { session } from '../stores/session'
+import mapImage from '../assets/city-map-home.png'
 
 const route = useRoute()
+const router = useRouter()
 const { properties, published, offline, loading, load } = usePropertyCatalog()
 const dialogVisible = ref(false)
 const saving = ref(false)
@@ -119,14 +187,23 @@ const form = reactive({
   layout: '',
   price: 0,
   area: 0,
-  description: ''
+  mapX: null,
+  mapY: null,
+  description: '',
+  imageUrl: '',
+  status: 'PUBLISHED'
 })
 
-const regions = computed(() => [...new Set(properties.value.map((item) => item.region))])
+const isAdmin = computed(() => session.user?.role === 'ADMIN')
+const visibleProperties = computed(() => properties.value)
+const regions = computed(() => [...new Set(visibleProperties.value.map((item) => item.region))])
+const addresses = computed(() => [...new Set(visibleProperties.value.map((item) => item.address).filter(Boolean))])
+const layouts = computed(() => [...new Set(visibleProperties.value.map((item) => item.layout).filter(Boolean))])
+const hasMapPosition = computed(() => form.mapX !== null && form.mapY !== null)
 
 const filteredProperties = computed(() => {
   const keyword = String(filters.keyword || '').trim().toLowerCase()
-  return properties.value.filter((property) => {
+  return visibleProperties.value.filter((property) => {
     const hitKeyword = !keyword || [property.title, property.region, property.address, property.layout]
       .some((value) => String(value || '').toLowerCase().includes(keyword))
     const hitRegion = !filters.region || property.region === filters.region
@@ -143,6 +220,14 @@ function resetFilters() {
   filters.status = ''
 }
 
+function goToDetail(property) {
+  router.push({
+    name: 'property-detail',
+    params: { id: property.id },
+    query: { from: 'list' }
+  })
+}
+
 function openCreate() {
   editingId.value = null
   Object.assign(form, {
@@ -152,7 +237,11 @@ function openCreate() {
     layout: '',
     price: 0,
     area: 0,
-    description: ''
+    mapX: null,
+    mapY: null,
+    description: '',
+    imageUrl: '',
+    status: 'PUBLISHED'
   })
   dialogVisible.value = true
 }
@@ -166,9 +255,19 @@ function openEdit(property) {
     layout: property.layout,
     price: property.price,
     area: property.area,
-    description: property.description
+    mapX: property.mapX,
+    mapY: property.mapY,
+    description: property.description,
+    imageUrl: property.imageUrl || '',
+    status: property.status || 'PUBLISHED'
   })
   dialogVisible.value = true
+}
+
+function selectMapPosition(event) {
+  const rect = event.currentTarget.getBoundingClientRect()
+  form.mapX = clampPercent(((event.clientX - rect.left) / rect.width) * 100)
+  form.mapY = clampPercent(((event.clientY - rect.top) / rect.height) * 100)
 }
 
 async function saveProperty() {
@@ -176,8 +275,25 @@ async function saveProperty() {
     ElMessage.warning('请填写房源名称、区域和总价')
     return
   }
+  if (!hasMapPosition.value) {
+    ElMessage.warning('请在地图上选择房源位置')
+    return
+  }
   saving.value = true
-  const payload = { ...form, status: 'PUBLISHED' }
+  const payload = {
+    title: form.title,
+    region: form.region,
+    address: form.address,
+    layout: form.layout,
+    price: form.price,
+    area: form.area,
+    mapX: form.mapX,
+    mapY: form.mapY,
+    description: form.description,
+    imageUrl: form.imageUrl || null,
+    status: form.status
+  }
+  const statusLabel = form.status === 'PUBLISHED' ? '已发布' : '已下架'
   try {
     if (editingId.value) {
       await updateProperty(editingId.value, payload)
@@ -193,7 +309,7 @@ async function saveProperty() {
       })
     }
     dialogVisible.value = false
-    ElMessage.success('房源已保存并发布')
+    ElMessage.success(`房源已保存（${statusLabel}）`)
   } catch {
     ElMessage.info('后端未连接，页面已保留当前演示状态')
   } finally {
@@ -205,21 +321,25 @@ async function toggleStatus(property) {
   const nextStatus = property.status === 'PUBLISHED' ? 'OFFLINE' : 'PUBLISHED'
   try {
     await updatePropertyStatus(property.id, nextStatus)
+    property.status = nextStatus
+    ElMessage.success(nextStatus === 'PUBLISHED' ? '已发布' : '已下架')
   } catch {
-    // 演示模式下直接更新本地状态。
+    ElMessage.error('状态更新失败')
   }
-  property.status = nextStatus
-  ElMessage.success(nextStatus === 'PUBLISHED' ? '已发布' : '已下架')
 }
 
 async function removeRow(property) {
   await ElMessageBox.confirm(`确定删除「${property.title}」吗？`, '删除房源', { type: 'warning' })
   try {
     await deleteProperty(property.id)
+    properties.value = properties.value.filter((item) => item.id !== property.id)
+    ElMessage.success('房源已删除')
   } catch {
-    // 演示模式下直接移除本地行。
+    ElMessage.error('删除失败')
   }
-  properties.value = properties.value.filter((item) => item.id !== property.id)
-  ElMessage.success('房源已删除')
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Number(value.toFixed(2))))
 }
 </script>

@@ -16,12 +16,43 @@
           v-for="property in visibleProperties"
           :key="property.id"
           class="map-pin"
-          :class="{ active: property.id === activeProperty?.id }"
-          :style="{ left: `${property.x}%`, top: `${property.y}%` }"
-          @click.stop="selectProperty(property)"
+          :class="{ active: property.id === hoveredProperty?.id, offline: property.status === 'OFFLINE' }"
+          :style="{ left: `${property.mapX}%`, top: `${property.mapY}%` }"
+          @mouseenter="showPropertyCard(property)"
+          @mouseleave="scheduleHidePropertyCard"
+          @click.stop="goToDetail(property)"
         >
-          <span>{{ moneyWan(property.price) }}</span>
+          <span><b>{{ property.title }}</b></span>
         </button>
+        <article
+          v-if="hoveredProperty"
+          class="map-hover-card"
+          :style="{ left: `${hoveredProperty.mapX}%`, top: `${hoveredProperty.mapY}%` }"
+          @mouseenter="cancelHidePropertyCard"
+          @mouseleave="scheduleHidePropertyCard"
+          @click.stop="goToDetail(hoveredProperty)"
+        >
+          <div class="map-card-art">
+            <img v-if="hoveredProperty.imageUrl" :src="hoveredProperty.imageUrl" :alt="hoveredProperty.title" />
+          </div>
+          <div class="map-card-body">
+            <div class="detail-topline">
+              <h2>{{ hoveredProperty.title }}</h2>
+              <StatusBadge :property-status="hoveredProperty.status" />
+            </div>
+            <p class="map-card-location">{{ hoveredProperty.region }} · {{ hoveredProperty.address }}</p>
+            <p>{{ hoveredProperty.layout }} 丨 {{ squareMeters(hoveredProperty.area) }} 丨 南北通透</p>
+            <div class="detail-price">
+              <strong>{{ moneyWan(hoveredProperty.price) }}</strong>
+              <span>{{ unitPrice(hoveredProperty) }}</span>
+            </div>
+            <div class="map-card-actions">
+              <span>☆ 收藏</span>
+              <i></i>
+              <span>☎ 联系管理员</span>
+            </div>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -42,9 +73,9 @@
         </el-form-item>
         <el-form-item label="户型">
           <el-select v-model="filters.layout" placeholder="全部户型" clearable>
-            <el-option label="两室" value="两" />
-            <el-option label="三室" value="三" />
-            <el-option label="四室" value="四" />
+            <el-option label="两室" :value="2" />
+            <el-option label="三室" :value="3" />
+            <el-option label="四室" :value="4" />
           </el-select>
         </el-form-item>
         <el-form-item label="总价区间（万元）">
@@ -57,56 +88,33 @@
       </el-form>
 
       <div class="filter-summary">
-        <span>已发布房源</span>
+        <span>地图房源</span>
         <strong>{{ visibleProperties.length }}</strong>
-      </div>
-    </aside>
-
-    <aside v-if="activeProperty" class="atlas-detail">
-      <div class="detail-topline">
-        <span>{{ activeProperty.region }}</span>
-        <StatusBadge :property-status="activeProperty.status" />
-      </div>
-      <h1>{{ activeProperty.title }}</h1>
-      <p>{{ activeProperty.address }} · {{ activeProperty.layout }} · {{ squareMeters(activeProperty.area) }}</p>
-      <div class="detail-price">
-        <strong>{{ moneyWan(activeProperty.price) }}</strong>
-        <span>{{ unitPrice(activeProperty) }}</span>
-      </div>
-      <div class="detail-contact">
-        <span>发布管理员</span>
-        <strong>{{ activeProperty.contactName }}</strong>
-        <a :href="`tel:${activeProperty.contactPhone}`">
-          <Phone />
-          {{ activeProperty.contactPhone }}
-        </a>
-      </div>
-      <div class="detail-actions">
-        <el-button type="primary" :icon="Phone">联系管理员</el-button>
-        <el-button :icon="Star">收藏</el-button>
       </div>
     </aside>
 
     <div class="map-tools">
       <button type="button" @click="resetMap"><Aim />定位</button>
-      <button type="button" @click="resetMap"><Refresh /></button>
     </div>
   </main>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { Aim, Phone, Refresh, Star } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { Aim, Refresh } from '@element-plus/icons-vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { usePropertyCatalog } from '../composables/usePropertyCatalog'
 import { moneyWan, squareMeters, unitPrice } from '../utils/formatters'
 import mapImage from '../assets/city-map-home.png'
 
-const { properties, published, load } = usePropertyCatalog()
+const { properties, load } = usePropertyCatalog()
+const router = useRouter()
 
 const mapCanvasRef = ref(null)
 const mapLayerRef = ref(null)
-const activeProperty = ref(null)
+const hoveredProperty = ref(null)
+const hideTimer = ref(null)
 
 const filters = reactive({
   region: '',
@@ -127,9 +135,9 @@ const dragState = reactive({
 
 const regions = computed(() => [...new Set(properties.value.map((item) => item.region))])
 
-const visibleProperties = computed(() => published.value.filter((property) => {
+const visibleProperties = computed(() => properties.value.filter((property) => {
   const hitRegion = !filters.region || property.region === filters.region
-  const hitLayout = !filters.layout || property.layout.includes(filters.layout)
+  const hitLayout = !filters.layout || getRoomCount(property.layout) === filters.layout
   const hitPrice = property.price >= filters.minPrice && property.price <= filters.maxPrice
   return hitRegion && hitLayout && hitPrice
 }))
@@ -139,30 +147,71 @@ const mapLayerStyle = computed(() => ({
 }))
 
 onMounted(async () => {
-  await load({ status: 'PUBLISHED' })
-  activeProperty.value = visibleProperties.value[0]
+  await load()
   nextTick(updateDragBounds)
   window.addEventListener('resize', updateDragBounds)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateDragBounds)
+  cancelHidePropertyCard()
 })
-
-function selectProperty(property) {
-  activeProperty.value = property
-}
 
 function resetFilters() {
   filters.region = ''
   filters.layout = ''
   filters.minPrice = 0
   filters.maxPrice = 2000
-  activeProperty.value = visibleProperties.value[0]
+  hoveredProperty.value = null
+}
+
+function showPropertyCard(property) {
+  cancelHidePropertyCard()
+  hoveredProperty.value = property
+}
+
+function scheduleHidePropertyCard() {
+  cancelHidePropertyCard()
+  hideTimer.value = window.setTimeout(() => {
+    hoveredProperty.value = null
+  }, 160)
+}
+
+function cancelHidePropertyCard() {
+  if (hideTimer.value) {
+    window.clearTimeout(hideTimer.value)
+    hideTimer.value = null
+  }
+}
+
+function goToDetail(property) {
+  router.push(`/properties/${property.id}`)
+}
+
+function getRoomCount(layout) {
+  const text = String(layout || '')
+  const digitMatch = text.match(/(\d+)\s*室/)
+  if (digitMatch) {
+    return Number(digitMatch[1])
+  }
+  const chineseMatch = text.match(/([一二两三四五六七八九])\s*室/)
+  const roomMap = {
+    一: 1,
+    二: 2,
+    两: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9
+  }
+  return chineseMatch ? roomMap[chineseMatch[1]] : null
 }
 
 function startDrag(event) {
-  if (event.target.closest('button, .atlas-detail, .atlas-filter')) {
+  if (event.target.closest('button, .map-hover-card, .atlas-filter')) {
     return
   }
   updateDragBounds()
@@ -187,8 +236,8 @@ function endDrag() {
 }
 
 function resetMap() {
-  mapOffset.x = 0
-  mapOffset.y = 0
+  updateDragBounds()
+  centerMap()
 }
 
 function updateDragBounds() {
@@ -203,6 +252,18 @@ function updateDragBounds() {
   dragBounds.maxY = 0
   mapOffset.x = clamp(mapOffset.x, dragBounds.minX, dragBounds.maxX)
   mapOffset.y = clamp(mapOffset.y, dragBounds.minY, dragBounds.maxY)
+}
+
+function centerMap() {
+  const canvas = mapCanvasRef.value
+  const layer = mapLayerRef.value
+  if (!canvas || !layer) {
+    return
+  }
+  const centeredX = (canvas.clientWidth - layer.offsetWidth) / 2
+  const centeredY = (canvas.clientHeight - layer.offsetHeight) / 2
+  mapOffset.x = clamp(centeredX, dragBounds.minX, dragBounds.maxX)
+  mapOffset.y = clamp(centeredY, dragBounds.minY, dragBounds.maxY)
 }
 
 function clamp(value, min, max) {

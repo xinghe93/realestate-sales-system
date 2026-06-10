@@ -25,11 +25,11 @@
         :prefix-icon="Search"
         @keyup.enter="search"
       />
-      <RouterLink class="icon-pill" to="/favorites" aria-label="收藏">
+      <button class="icon-pill" :class="{ 'is-active': isFavoritesRoute }" type="button" aria-label="收藏" @click="openFavorites">
         <Star />
         <span>收藏</span>
-      </RouterLink>
-      <RouterLink class="user-pill" :to="session.user ? '/settings' : '/login'">
+      </button>
+      <RouterLink class="user-pill" :class="{ 'is-active': isUserRoute }" :to="session.user ? '/settings' : '/login'">
         <span class="user-orb"></span>
         <span>{{ userName }}</span>
       </RouterLink>
@@ -39,7 +39,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   List,
   Location,
@@ -50,6 +50,7 @@ import {
 import { session } from '../stores/session'
 
 const router = useRouter()
+const route = useRoute()
 const keyword = ref('')
 
 const navItems = [
@@ -58,11 +59,21 @@ const navItems = [
 ]
 
 const userName = computed(() => session.user?.realName || session.user?.username || '登录')
+const isFavoritesRoute = computed(() => route.path === '/favorites')
+const isUserRoute = computed(() => ['/settings', '/login', '/register'].includes(route.path))
 
 function search() {
   router.push({
     path: '/properties',
     query: keyword.value.trim() ? { keyword: keyword.value.trim() } : {}
   })
+}
+
+async function openFavorites() {
+  if (session.user) {
+    router.push('/favorites')
+    return
+  }
+  router.push('/login')
 }
 </script>

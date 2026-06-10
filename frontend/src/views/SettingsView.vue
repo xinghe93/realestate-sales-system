@@ -3,7 +3,6 @@
     <PageHeader
       kicker="User Center"
       title="用户中心"
-      description="维护个人联系方式，管理员可查看和管理系统用户。"
     >
       <template #actions>
         <el-button type="danger" plain :icon="SwitchButton" @click="signOut">退出登录</el-button>
@@ -51,8 +50,15 @@
         <h2>用户账号管理</h2>
       </div>
       <div v-loading="loadingUsers" class="ledger-list">
+        <div class="ledger-head">
+          <span>用户</span>
+          <span>角色</span>
+          <span>状态</span>
+          <span>登录失败</span>
+          <span>操作</span>
+        </div>
         <article v-for="user in users" :key="user.id" class="ledger-row">
-          <div>
+          <div class="ledger-user">
             <h3>{{ user.realName || user.username }}</h3>
             <p>{{ user.username }} · {{ user.phone || '未填写电话' }} · {{ user.email || '未填写邮箱' }}</p>
           </div>

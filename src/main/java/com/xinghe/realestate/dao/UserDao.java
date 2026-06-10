@@ -120,6 +120,33 @@ public class UserDao {
         }
     }
 
+    public boolean isActive(Long id) {
+        String sql = "select status from users where id = ?";
+        try (Connection connection = DbUtil.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, id);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    return UserStatus.valueOf(rs.getString("status")) == UserStatus.ACTIVE;
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to check user status", e);
+        }
+        return false;
+    }
+
+    public long countActiveAdmins() {
+        String sql = "select count(*) from users where role = 'ADMIN' and status = 'ACTIVE'";
+        try (Connection connection = DbUtil.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet rs = statement.executeQuery()) {
+            return rs.next() ? rs.getLong(1) : 0;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to count active admins", e);
+        }
+    }
+
     public void updateLoginSecurity(Long id, int failedLoginCount, LocalDateTime lockedUntil) {
         String sql = "update users set failed_login_count = ?, locked_until = ? where id = ?";
         try (Connection connection = DbUtil.getConnection();

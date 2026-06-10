@@ -4,18 +4,12 @@
       <div class="auth-poster">
         <span class="section-kicker">Buyer Gate</span>
         <h1>注册购房用户</h1>
-        <p>注册后可浏览已发布房源、收藏心仪房源，并联系发布管理员。</p>
-        <div class="auth-tags">
-          <span>浏览房源</span>
-          <span>收藏房源</span>
-          <span>维护资料</span>
-        </div>
       </div>
 
       <el-form class="gate-form register-gate" label-position="top" @submit.prevent>
         <div class="gate-head">
           <h2>创建账号</h2>
-          <RouterLink to="/login">返回登录</RouterLink>
+          <RouterLink to="/login">已有账号，去登录</RouterLink>
         </div>
         <div class="gate-grid">
           <el-form-item label="用户名">
@@ -35,7 +29,7 @@
           </el-form-item>
         </div>
         <el-button class="wide-action" type="primary" size="large" :loading="submitting" @click="submitRegister">
-          注册普通用户
+          注册
         </el-button>
       </el-form>
     </section>

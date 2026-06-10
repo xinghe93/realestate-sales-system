@@ -1,5 +1,6 @@
 package com.xinghe.realestate.filter;
 
+import com.xinghe.realestate.dao.UserDao;
 import com.xinghe.realestate.model.ApiResponse;
 import com.xinghe.realestate.model.LoginUser;
 import com.xinghe.realestate.util.JsonUtil;
@@ -33,8 +34,15 @@ public class AuthFilter implements Filter {
             JsonUtil.write(httpResponse, HttpServletResponse.SC_UNAUTHORIZED, ApiResponse.fail("请先登录"));
             return;
         }
+        if (!userDao.isActive(loginUser.getId())) {
+            httpRequest.getSession().invalidate();
+            JsonUtil.write(httpResponse, HttpServletResponse.SC_FORBIDDEN, ApiResponse.fail("账号已被禁用"));
+            return;
+        }
         chain.doFilter(request, response);
     }
+
+    private final UserDao userDao = new UserDao();
 
     private boolean isPublicEndpoint(HttpServletRequest request) {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {

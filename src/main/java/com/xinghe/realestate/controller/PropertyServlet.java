@@ -24,11 +24,15 @@ public class PropertyServlet extends BaseServlet {
         Long id = RequestUtil.pathId(request);
         LoginUser loginUser = currentUser(request);
         boolean adminView = loginUser != null && loginUser.isAdmin();
-        if (id == null) {
-            ok(response, propertyService.list(buildQuery(request, adminView), adminView));
+        if (id != null) {
+            Property property = propertyService.get(id);
+            if (!adminView && property.getStatus() != PropertyStatus.PUBLISHED) {
+                throw new AppException(404, "房源不存在");
+            }
+            ok(response, property);
             return;
         }
-        ok(response, propertyService.get(id, adminView));
+        ok(response, propertyService.list(buildQuery(request, adminView)));
     }
 
     @Override

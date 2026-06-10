@@ -51,8 +51,15 @@ public class UserService {
         userDao.updateByAdmin(user);
     }
 
-    public void disable(Long id) {
+    public void disable(Long id, Long currentAdminId) {
+        if (id.equals(currentAdminId)) {
+            throw new AppException("不能禁用自己的账号");
+        }
         User user = get(id);
+        if (user.getRole() == Role.ADMIN && user.getStatus() == UserStatus.ACTIVE
+                && userDao.countActiveAdmins() <= 1) {
+            throw new AppException("不能禁用最后一个管理员");
+        }
         user.setStatus(UserStatus.DISABLED);
         userDao.updateByAdmin(user);
     }

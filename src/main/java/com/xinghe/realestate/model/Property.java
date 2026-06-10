@@ -11,6 +11,8 @@ public class Property {
     private String layout;
     private BigDecimal price;
     private BigDecimal area;
+    private BigDecimal mapX;
+    private BigDecimal mapY;
     private String imageUrl;
     private String description;
     private PropertyStatus status;
@@ -74,6 +76,22 @@ public class Property {
 
     public void setArea(BigDecimal area) {
         this.area = area;
+    }
+
+    public BigDecimal getMapX() {
+        return mapX;
+    }
+
+    public void setMapX(BigDecimal mapX) {
+        this.mapX = mapX;
+    }
+
+    public BigDecimal getMapY() {
+        return mapY;
+    }
+
+    public void setMapY(BigDecimal mapY) {
+        this.mapY = mapY;
     }
 
     public String getImageUrl() {

@@ -58,12 +58,12 @@ public class UserServlet extends BaseServlet {
 
     @Override
     protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        requireAdmin(request);
+        LoginUser admin = requireAdmin(request);
         Long id = RequestUtil.pathId(request);
         if (id == null) {
             throw new AppException("缺少用户 ID");
         }
-        userService.disable(id);
+        userService.disable(id, admin.getId());
         ok(response, "用户已禁用", null);
     }
 

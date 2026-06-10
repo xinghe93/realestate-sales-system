@@ -11,25 +11,42 @@ const markerPositions = [
   { x: 52, y: 58 }
 ]
 
+const sampleImages = [
+  '/property-images/interior-river-suite.png',
+  '/property-images/interior-city-lounge.png',
+  '/property-images/interior-cozy-flat.png',
+  '/property-images/interior-luxury-flat.png'
+]
+
 export function normalizeProperty(property, index = 0) {
   const point = markerPositions[index % markerPositions.length]
+  const mapX = Number(property.mapX ?? property.x ?? point.x)
+  const mapY = Number(property.mapY ?? property.y ?? point.y)
+  const price = normalizePriceWan(property.price)
   return {
     id: property.id ?? index + 1,
     title: property.title || '未命名房源',
     region: property.region || '未知区域',
     address: property.address || '未填写地址',
     layout: property.layout || '未填写户型',
-    price: Number(property.price || 0),
+    price,
     area: Number(property.area || 0),
-    imageUrl: property.imageUrl || '',
+    imageUrl: property.imageUrl ?? null,
     description: property.description || '暂无房源描述',
     status: property.status || 'PUBLISHED',
     contactName: property.contactName || '发布管理员',
     contactPhone: property.contactPhone || '未填写电话',
     createdBy: property.createdBy,
-    x: property.x || point.x,
-    y: property.y || point.y
+    mapX,
+    mapY,
+    x: mapX,
+    y: mapY
   }
+}
+
+function normalizePriceWan(value) {
+  const price = Number(value || 0)
+  return price > 10000 ? Number((price / 10000).toFixed(2)) : price
 }
 
 export function usePropertyCatalog(options = {}) {

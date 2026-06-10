@@ -1,6 +1,7 @@
 <template>
   <article class="property-card">
-    <div class="property-art">
+    <div class="property-art" :class="{ 'has-image': property.imageUrl }">
+      <img v-if="property.imageUrl" :src="property.imageUrl" :alt="property.title" />
       <span>{{ property.region }}</span>
     </div>
     <div class="property-card-content">

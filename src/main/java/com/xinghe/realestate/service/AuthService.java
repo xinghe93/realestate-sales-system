@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 
 public class AuthService {
-    private static final int CAPTCHA_THRESHOLD = 3;
     private static final int LOCK_THRESHOLD = 5;
     private static final int LOCK_MINUTES = 10;
 
@@ -44,15 +43,6 @@ public class AuthService {
 
         userDao.updateLoginSecurity(user.getId(), 0, null);
         return new LoginUser(user.getId(), user.getUsername(), user.getRealName(), user.getRole());
-    }
-
-    public boolean shouldRequireCaptcha(String username) {
-        if (isBlank(username)) {
-            return false;
-        }
-        return userDao.findByUsername(username)
-                .map(user -> user.getFailedLoginCount() >= CAPTCHA_THRESHOLD)
-                .orElse(false);
     }
 
     public Long register(User user, String password) {

@@ -11,21 +11,16 @@ import java.math.BigDecimal;
 
 public class PropertyService {
     private final PropertyDao propertyDao = new PropertyDao();
+    private static final BigDecimal MAP_MIN = BigDecimal.ZERO;
+    private static final BigDecimal MAP_MAX = BigDecimal.valueOf(100);
 
-    public PageResult<Property> list(PropertyQuery query, boolean adminView) {
-        if (!adminView) {
-            query.setStatus(PropertyStatus.PUBLISHED);
-        }
+    public PageResult<Property> list(PropertyQuery query) {
         return propertyDao.list(query);
     }
 
-    public Property get(Long id, boolean adminView) {
-        Property property = propertyDao.findById(id)
+    public Property get(Long id) {
+        return propertyDao.findById(id)
                 .orElseThrow(() -> new AppException(404, "房源不存在"));
-        if (!adminView && property.getStatus() != PropertyStatus.PUBLISHED) {
-            throw new AppException(404, "房源不存在");
-        }
-        return property;
     }
 
     public Long create(Property property, Long adminId) {
@@ -38,26 +33,32 @@ public class PropertyService {
     }
 
     public void update(Long id, Property property) {
-        propertyDao.findById(id).orElseThrow(() -> new AppException(404, "房源不存在"));
         validate(property);
         property.setId(id);
         if (property.getStatus() == null) {
             property.setStatus(PropertyStatus.PUBLISHED);
+        } else if (property.getStatus() != PropertyStatus.PUBLISHED
+                && property.getStatus() != PropertyStatus.OFFLINE) {
+            throw new AppException("房源状态不合法");
         }
-        propertyDao.update(property);
+        if (propertyDao.update(property) == 0) {
+            throw new AppException(404, "房源不存在");
+        }
     }
 
     public void audit(Long id, PropertyStatus status) {
-        propertyDao.findById(id).orElseThrow(() -> new AppException(404, "房源不存在"));
         if (status != PropertyStatus.PUBLISHED && status != PropertyStatus.OFFLINE) {
             throw new AppException("审核状态不合法");
         }
-        propertyDao.updateStatus(id, status);
+        if (propertyDao.updateStatus(id, status) == 0) {
+            throw new AppException(404, "房源不存在");
+        }
     }
 
     public void delete(Long id) {
-        propertyDao.findById(id).orElseThrow(() -> new AppException(404, "房源不存在"));
-        propertyDao.delete(id);
+        if (propertyDao.delete(id) == 0) {
+            throw new AppException(404, "房源不存在");
+        }
     }
 
     private void validate(Property property) {
@@ -75,6 +76,17 @@ public class PropertyService {
         }
         if (property.getArea() == null || property.getArea().compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException("面积必须大于 0");
+        }
+        validateMapPosition(property.getMapX(), "地图横坐标");
+        validateMapPosition(property.getMapY(), "地图纵坐标");
+    }
+
+    private void validateMapPosition(BigDecimal value, String label) {
+        if (value == null) {
+            throw new AppException("请选择房源在地图上的位置");
+        }
+        if (value.compareTo(MAP_MIN) < 0 || value.compareTo(MAP_MAX) > 0) {
+            throw new AppException(label + "必须在 0 到 100 之间");
         }
     }
 

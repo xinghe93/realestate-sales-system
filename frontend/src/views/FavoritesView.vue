@@ -3,7 +3,6 @@
     <PageHeader
       kicker="Buyer Collection"
       title="我的收藏"
-      description="保留心仪的已发布房源，快速查看发布管理员电话。"
     >
       <template #actions>
         <el-button :icon="Refresh" @click="loadFavorites">刷新收藏</el-button>
@@ -13,10 +12,6 @@
     <section class="collection-layout">
       <aside class="collection-summary">
         <MetricTile label="收藏房源" :value="cards.length" hint="已下架房源不展示" />
-        <div class="collection-note">
-          <span>Contact Path</span>
-          <p>用户看中心仪房源后，可以收藏，也可以直接拨打发布管理员电话。</p>
-        </div>
       </aside>
 
       <section v-loading="loading" class="collection-grid">

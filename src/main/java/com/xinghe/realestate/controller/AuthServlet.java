@@ -48,25 +48,17 @@ public class AuthServlet extends BaseServlet {
 
     private void login(HttpServletRequest request, HttpServletResponse response) throws IOException {
         LoginRequest loginRequest = JsonUtil.read(request, LoginRequest.class);
-        boolean captchaRequired = Boolean.TRUE.equals(request.getSession().getAttribute(SessionKeys.CAPTCHA_REQUIRED))
-                || authService.shouldRequireCaptcha(loginRequest.username);
-        if (captchaRequired) {
-            String answer = (String) request.getSession().getAttribute(SessionKeys.CAPTCHA_ANSWER);
-            if (answer == null || !answer.equals(loginRequest.captcha)) {
-                throw new AppException("验证码错误");
-            }
+        String answer = (String) request.getSession().getAttribute(SessionKeys.CAPTCHA_ANSWER);
+        if (answer == null || loginRequest.captcha == null || !answer.equals(loginRequest.captcha.trim())) {
+            throw new AppException("验证码错误");
         }
 
         try {
             LoginUser loginUser = authService.login(loginRequest.username, loginRequest.password);
             request.getSession().setAttribute(SessionKeys.LOGIN_USER, loginUser);
-            request.getSession().removeAttribute(SessionKeys.CAPTCHA_REQUIRED);
             request.getSession().removeAttribute(SessionKeys.CAPTCHA_ANSWER);
             ok(response, "登录成功", loginUser);
         } catch (AppException e) {
-            if (authService.shouldRequireCaptcha(loginRequest.username)) {
-                request.getSession().setAttribute(SessionKeys.CAPTCHA_REQUIRED, true);
-            }
             JsonUtil.write(response, e.getStatusCode(), ApiResponse.fail(e.getMessage()));
         }
     }

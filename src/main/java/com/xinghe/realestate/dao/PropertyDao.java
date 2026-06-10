@@ -73,14 +73,14 @@ public class PropertyDao {
 
     public Long create(Property property) {
         String sql = """
-                insert into properties(title, region, address, layout, price, area, image_url, description, status, created_by)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                insert into properties(title, region, address, layout, price, area, map_x, map_y, image_url, description, status, created_by)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (Connection connection = DbUtil.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             bindEditableProperty(statement, property);
-            statement.setString(9, property.getStatus().name());
-            statement.setLong(10, property.getCreatedBy());
+            statement.setString(11, property.getStatus().name());
+            statement.setLong(12, property.getCreatedBy());
             statement.executeUpdate();
             try (ResultSet keys = statement.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -93,42 +93,42 @@ public class PropertyDao {
         throw new IllegalStateException("Failed to read generated property id");
     }
 
-    public void update(Property property) {
+    public int update(Property property) {
         String sql = """
                 update properties
                 set title = ?, region = ?, address = ?, layout = ?, price = ?, area = ?,
-                    image_url = ?, description = ?, status = ?
+                    map_x = ?, map_y = ?, image_url = ?, description = ?, status = ?
                 where id = ?
                 """;
         try (Connection connection = DbUtil.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             bindEditableProperty(statement, property);
-            statement.setString(9, property.getStatus().name());
-            statement.setLong(10, property.getId());
-            statement.executeUpdate();
+            statement.setString(11, property.getStatus().name());
+            statement.setLong(12, property.getId());
+            return statement.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to update property", e);
         }
     }
 
-    public void updateStatus(Long id, PropertyStatus status) {
+    public int updateStatus(Long id, PropertyStatus status) {
         String sql = "update properties set status = ? where id = ?";
         try (Connection connection = DbUtil.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, status.name());
             statement.setLong(2, id);
-            statement.executeUpdate();
+            return statement.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to update property status", e);
         }
     }
 
-    public void delete(Long id) {
+    public int delete(Long id) {
         String sql = "delete from properties where id = ?";
         try (Connection connection = DbUtil.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, id);
-            statement.executeUpdate();
+            return statement.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Failed to delete property", e);
         }
@@ -188,8 +188,10 @@ public class PropertyDao {
         statement.setString(4, property.getLayout());
         statement.setBigDecimal(5, property.getPrice());
         statement.setBigDecimal(6, property.getArea());
-        statement.setString(7, property.getImageUrl());
-        statement.setString(8, property.getDescription());
+        statement.setBigDecimal(7, property.getMapX());
+        statement.setBigDecimal(8, property.getMapY());
+        statement.setString(9, property.getImageUrl());
+        statement.setString(10, property.getDescription());
     }
 
     private Property mapProperty(ResultSet rs) throws SQLException {
@@ -201,6 +203,8 @@ public class PropertyDao {
         property.setLayout(rs.getString("layout"));
         property.setPrice(rs.getBigDecimal("price"));
         property.setArea(rs.getBigDecimal("area"));
+        property.setMapX(rs.getBigDecimal("map_x"));
+        property.setMapY(rs.getBigDecimal("map_y"));
         property.setImageUrl(rs.getString("image_url"));
         property.setDescription(rs.getString("description"));
         property.setStatus(PropertyStatus.valueOf(rs.getString("status")));
